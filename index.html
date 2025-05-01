@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Control LEDs</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h2 {
+            color: #333;
+        }
+        button {
+            margin: 5px;
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Choose Mode</h2>
+
+<!-- Mode Selection -->
+<form id="modeForm">
+    <input type="radio" name="mode" value="automatic" checked> Automatic<br>
+    <input type="radio" name="mode" value="manual"> Manual<br><br>
+    
+    <!-- Manual Control Buttons (only shown when manual is selected) -->
+    <div id="manual-controls" style="display:none;">
+        <button type="button" onclick="controlLED('line1')">Line 1</button><br>
+        <button type="button" onclick="controlLED('line2')">Line 2</button><br>
+        <button type="button" onclick="controlLED('line3')">Line 3</button><br>
+        <button type="button" onclick="controlLED('line4')">Line 4</button><br>
+        <button type="button" onclick="controlLED('cycling')">Cycling</button><br>
+    </div>
+</form>
+
+<script>
+// Detect when the user switches modes
+const radios = document.getElementsByName('mode');
+radios.forEach(radio => {
+    radio.addEventListener('change', function() {
+        if (this.value === 'manual') {
+            document.getElementById('manual-controls').style.display = 'block';
+        } else {
+            document.getElementById('manual-controls').style.display = 'none';
+        }
+    });
+});
+
+// Control LED Function (sends request to the Pico)
+function controlLED(action) {
+    fetch(`http://<PICO_IP>/manual/${action}`)
+        .then(response => response.text())
+        .then(data => {
+            console.log(data);
+            alert('LED control executed: ' + action);
+        })
+        .catch(error => console.error('Error:', error));
+}
+</script>
+
+</body>
+</html>
