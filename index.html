@@ -1,66 +1,84 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Control LEDs</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        h2 {
-            color: #333;
-        }
-        button {
-            margin: 5px;
-            padding: 10px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-    </style>
+  <title>Traffic Signal Control</title>
+  <style>
+    body { font-family: Arial; padding: 20px; text-align: center; }
+    .hidden { display: none; }
+    .data-box { margin-top: 20px; padding: 10px; border: 1px solid #ccc; display: inline-block; text-align: left; }
+    button { padding: 10px; margin: 5px; font-size: 16px; }
+  </style>
 </head>
 <body>
+  <h2>🚦 Traffic Signal Control Panel</h2>
 
-<h2>Choose Mode</h2>
+  <!-- Mode Selection -->
+  <div>
+    <label><input type="radio" name="mode" value="automatic" checked> Automatic</label>
+    <label><input type="radio" name="mode" value="manual"> Manual</label>
+  </div>
 
-<!-- Mode Selection -->
-<form id="modeForm">
-    <input type="radio" name="mode" value="automatic" checked> Automatic<br>
-    <input type="radio" name="mode" value="manual"> Manual<br><br>
-    
-    <!-- Manual Control Buttons (only shown when manual is selected) -->
-    <div id="manual-controls" style="display:none;">
-        <button type="button" onclick="controlLED('line1')">Line 1</button><br>
-        <button type="button" onclick="controlLED('line2')">Line 2</button><br>
-        <button type="button" onclick="controlLED('line3')">Line 3</button><br>
-        <button type="button" onclick="controlLED('line4')">Line 4</button><br>
-        <button type="button" onclick="controlLED('cycling')">Cycling</button><br>
-    </div>
-</form>
+  <!-- Manual Controls -->
+  <div id="manual-controls" class="hidden">
+    <button onclick="sendCommand('line1')">Line 1</button>
+    <button onclick="sendCommand('line2')">Line 2</button>
+    <button onclick="sendCommand('line4')">Line 3</button>
+    <button onclick="sendCommand('line3')">Line 4</button>
+    <button onclick="sendCommand('cycle')">Cycle</button>
+  </div>
 
-<script>
-// Detect when the user switches modes
-const radios = document.getElementsByName('mode');
-radios.forEach(radio => {
-    radio.addEventListener('change', function() {
-        if (this.value === 'manual') {
-            document.getElementById('manual-controls').style.display = 'block';
-        } else {
-            document.getElementById('manual-controls').style.display = 'none';
-        }
+  <!-- Display Live Data -->
+  <div class="data-box">
+    <h3>📡 Live Data from Firebase</h3>
+    <p><strong>Mode:</strong> <span id="mode-display">--</span></p>
+    <p><strong>Manual Command:</strong> <span id="command-display">--</span></p>
+    <p><strong>Latitude:</strong> <span id="lat-display">--</span></p>
+    <p><strong>Longitude:</strong> <span id="lon-display">--</span></p>
+  </div>
+
+  <script>
+    const dbURL = "https://your-project-id.firebaseio.com/"; // replace with your database URL
+
+    function setMode(mode) {
+      fetch(`${dbURL}mode.json`, {
+        method: 'PUT',
+        body: JSON.stringify(mode),
+      });
+      document.getElementById("manual-controls").classList.toggle("hidden", mode !== "manual");
+    }
+
+    function sendCommand(command) {
+      fetch(`${dbURL}manual_command.json`, {
+        method: 'PUT',
+        body: JSON.stringify(command),
+      });
+    }
+
+    document.querySelectorAll('input[name="mode"]').forEach(radio => {
+      radio.addEventListener('change', e => setMode(e.target.value));
     });
-});
 
-// Control LED Function (sends request to the Pico)
-function controlLED(action) {
-    fetch(`http://<PICO_IP>/manual/${action}`)
-        .then(response => response.text())
+    function updateData() {
+      fetch(`${dbURL}.json`)
+        .then(response => response.json())
         .then(data => {
-            console.log(data);
-            alert('LED control executed: ' + action);
-        })
-        .catch(error => console.error('Error:', error));
-}
-</script>
+          document.getElementById("mode-display").innerText = data.mode || "--";
+          document.getElementById("command-display").innerText = data.manual_command || "--";
+          document.getElementById("lat-display").innerText = data.gps?.latitude?.toFixed(6) || "--";
+          document.getElementById("lon-display").innerText = data.gps?.longitude?.toFixed(6) || "--";
 
+          // Set the radio based on Firebase mode
+          if (data.mode) {
+            document.querySelector(`input[name="mode"][value="${data.mode}"]`).checked = true;
+            document.getElementById("manual-controls").classList.toggle("hidden", data.mode !== "manual");
+          }
+        })
+        .catch(err => console.error("Failed to fetch Firebase data:", err));
+    }
+
+    // Refresh every 2 seconds
+    setInterval(updateData, 2000);
+    window.onload = updateData;
+  </script>
 </body>
 </html>
