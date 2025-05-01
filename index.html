@@ -1,84 +1,131 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Traffic Signal Control</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control Traffic Signal</title>
   <style>
-    body { font-family: Arial; padding: 20px; text-align: center; }
-    .hidden { display: none; }
-    .data-box { margin-top: 20px; padding: 10px; border: 1px solid #ccc; display: inline-block; text-align: left; }
-    button { padding: 10px; margin: 5px; font-size: 16px; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .section h2 {
+      margin-bottom: 10px;
+    }
+    #gps-data {
+      margin-top: 20px;
+    }
+    .radio-group {
+      margin-top: 20px;
+    }
+    button {
+      padding: 10px 15px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin: 5px 0;
+      border-radius: 5px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
   </style>
 </head>
 <body>
-  <h2>🚦 Traffic Signal Control Panel</h2>
+  <div class="container">
+    <h1>Traffic Signal Control</h1>
 
-  <!-- Mode Selection -->
-  <div>
-    <label><input type="radio" name="mode" value="automatic" checked> Automatic</label>
-    <label><input type="radio" name="mode" value="manual"> Manual</label>
-  </div>
+    <!-- Mode Selector -->
+    <div class="section">
+      <h2>Select Mode</h2>
+      <div class="radio-group">
+        <label>
+          <input type="radio" name="mode" value="automatic" checked> Automatic
+        </label>
+        <label>
+          <input type="radio" name="mode" value="manual"> Manual
+        </label>
+      </div>
+    </div>
 
-  <!-- Manual Controls -->
-  <div id="manual-controls" class="hidden">
-    <button onclick="sendCommand('line1')">Line 1</button>
-    <button onclick="sendCommand('line2')">Line 2</button>
-    <button onclick="sendCommand('line4')">Line 3</button>
-    <button onclick="sendCommand('line3')">Line 4</button>
-    <button onclick="sendCommand('cycle')">Cycle</button>
-  </div>
+    <!-- Manual Control -->
+    <div class="section" id="manual-controls" style="display: none;">
+      <h2>Manual Controls</h2>
+      <button onclick="sendControlCommand('line1')">Line 1</button>
+      <button onclick="sendControlCommand('line2')">Line 2</button>
+      <button onclick="sendControlCommand('line3')">Line 3</button>
+      <button onclick="sendControlCommand('line4')">Line 4</button>
+      <button onclick="sendControlCommand('cycling')">Cycling</button>
+    </div>
 
-  <!-- Display Live Data -->
-  <div class="data-box">
-    <h3>📡 Live Data from Firebase</h3>
-    <p><strong>Mode:</strong> <span id="mode-display">--</span></p>
-    <p><strong>Manual Command:</strong> <span id="command-display">--</span></p>
-    <p><strong>Latitude:</strong> <span id="lat-display">--</span></p>
-    <p><strong>Longitude:</strong> <span id="lon-display">--</span></p>
+    <!-- GPS Data -->
+    <div class="section" id="gps-data">
+      <h2>Current GPS Location</h2>
+      <p><strong>Latitude:</strong> <span id="latitude">Loading...</span></p>
+      <p><strong>Longitude:</strong> <span id="longitude">Loading...</span></p>
+    </div>
   </div>
 
   <script>
-    const dbURL = "https://ambulancetracker-78884-default-rtdb.europe-west1.firebasedatabase.app/"; // replace with your database URL
+    const dbURL = "https://ambulancetracker-78884-default-rtdb.europe-west1.firebasedatabase.app/ambulance.json"; // Replace with your Firebase URL
 
-    function setMode(mode) {
-      fetch(`${dbURL}mode.json`, {
-        method: 'PUT',
-        body: JSON.stringify(mode),
-      });
-      document.getElementById("manual-controls").classList.toggle("hidden", mode !== "manual");
+    // Fetch GPS data from Firebase
+    async function fetchGPSData() {
+      try {
+        const response = await fetch(dbURL);
+        const data = await response.json();
+
+        const lat = data.lat;
+        const lon = data.lon;
+
+        document.getElementById("latitude").textContent = lat.toFixed(6);
+        document.getElementById("longitude").textContent = lon.toFixed(6);
+      } catch (error) {
+        console.error("Error fetching GPS data:", error);
+      }
     }
 
-    function sendCommand(command) {
-      fetch(`${dbURL}manual_command.json`, {
-        method: 'PUT',
-        body: JSON.stringify(command),
-      });
-    }
+    // Update GPS data every 3 seconds
+    setInterval(fetchGPSData, 3000); // refresh every 3 seconds
 
-    document.querySelectorAll('input[name="mode"]').forEach(radio => {
-      radio.addEventListener('change', e => setMode(e.target.value));
+    // Handle mode change (Automatic/Manual)
+    const radioButtons = document.querySelectorAll('input[name="mode"]');
+    radioButtons.forEach(radio => {
+      radio.addEventListener('change', function () {
+        if (this.value === 'manual') {
+          document.getElementById('manual-controls').style.display = 'block';
+        } else {
+          document.getElementById('manual-controls').style.display = 'none';
+        }
+      });
     });
 
-    function updateData() {
-      fetch(`${dbURL}.json`)
+    // Send control command to Raspberry Pi Pico (Manual Mode)
+    function sendControlCommand(command) {
+      fetch(`/control/${command}`, { method: 'POST' })
         .then(response => response.json())
         .then(data => {
-          document.getElementById("mode-display").innerText = data.mode || "--";
-          document.getElementById("command-display").innerText = data.manual_command || "--";
-          document.getElementById("lat-display").innerText = data.gps?.latitude?.toFixed(6) || "--";
-          document.getElementById("lon-display").innerText = data.gps?.longitude?.toFixed(6) || "--";
-
-          // Set the radio based on Firebase mode
-          if (data.mode) {
-            document.querySelector(`input[name="mode"][value="${data.mode}"]`).checked = true;
-            document.getElementById("manual-controls").classList.toggle("hidden", data.mode !== "manual");
-          }
+          console.log('Control command sent:', command);
         })
-        .catch(err => console.error("Failed to fetch Firebase data:", err));
+        .catch(error => {
+          console.error('Error sending control command:', error);
+        });
     }
 
-    // Refresh every 2 seconds
-    setInterval(updateData, 2000);
-    window.onload = updateData;
   </script>
 </body>
 </html>
